@@ -1,0 +1,35 @@
+CREATE FUNCTION dbo.describe (@TABLENAME varchar(50))
+returns table
+as
+RETURN
+(
+SELECT TOP 1000 c.column_name AS [ColumnName],
+       CASE WHEN pk.COLUMN_NAME IS NOT NULL THEN 'YES' ELSE 'NO' END AS [Pk],
+       DATA_TYPE + '(' + CASE 
+                                    WHEN DATA_TYPE = 'varchar' or DATA_TYPE = 'char' THEN 
+                                      CASE 
+                                        WHEN Cast(CHARACTER_MAXIMUM_LENGTH AS VARCHAR(5)) = -1 THEN 'Max'
+                                        ELSE Cast(CHARACTER_MAXIMUM_LENGTH AS VARCHAR(5))
+                                      END
+                                    WHEN DATA_TYPE = 'decimal' or DATA_TYPE = 'numeric' THEN
+                                      Cast(NUMERIC_PRECISION AS VARCHAR(5))+', '+Cast(NUMERIC_SCALE AS VARCHAR(5))
+                                    WHEN DATA_TYPE = 'bigint' or DATA_TYPE = 'int' THEN
+                                      Cast(NUMERIC_PRECISION AS VARCHAR(5))
+                                    ELSE ''
+                                  END + ')' AS [DataType]
+FROM   INFORMATION_SCHEMA.Columns c
+LEFT JOIN (
+            SELECT ku.TABLE_CATALOG,ku.TABLE_SCHEMA,ku.TABLE_NAME,ku.COLUMN_NAME
+            FROM INFORMATION_SCHEMA.TABLE_CONSTRAINTS AS tc
+            INNER JOIN INFORMATION_SCHEMA.KEY_COLUMN_USAGE AS ku
+                ON tc.CONSTRAINT_TYPE = 'PRIMARY KEY' 
+                AND tc.CONSTRAINT_NAME = ku.CONSTRAINT_NAME
+         )   pk 
+ON  c.TABLE_CATALOG = pk.TABLE_CATALOG
+            AND c.TABLE_SCHEMA = pk.TABLE_SCHEMA
+            AND c.TABLE_NAME = pk.TABLE_NAME
+            AND c.COLUMN_NAME = pk.COLUMN_NAME
+WHERE  c.table_name = @TABLENAME
+order by ordinal_Position
+);
+GO
